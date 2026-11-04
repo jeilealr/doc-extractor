@@ -1,0 +1,30 @@
+# Optional local hooks running the same format and lint checks as CI (.github/workflows/ci.yml).
+# Setup once:   pip install pre-commit && pre-commit install
+# Run by hand:  pre-commit run --all-files
+# The hooks use the ruff installed in your environment (dev extra), so local and CI versions match.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: ruff format (black style)
+        entry: ruff format
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-check
+        name: ruff check (lint + isort)
+        entry: ruff check --fix
+        language: system
+        types_or: [python, pyi]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+        exclude: ^docs/design/bank-profiles/
+      - id: check-toml
+      - id: end-of-file-fixer
+        exclude: ^examples/.*/(data|results)/
+      - id: trailing-whitespace
+        exclude: ^examples/.*/(data|results)/
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: forbid-new-submodules

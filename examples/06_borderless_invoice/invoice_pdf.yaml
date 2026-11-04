@@ -1,0 +1,37 @@
+# Source profile for the fictional invoice in examples/06_borderless_invoice/data/demo_invoice.pdf.
+# The line items have no cell borders. Instead of guessing columns from text alignment
+# (the borderless preset), the table is located by its header row: column boundaries
+# come from the header names and the empty gaps between the columns.
+profile_schema_version: 1
+id: demo.invoice.pdf.v1
+version: 1.0.0
+kind: source
+format: pdf
+description: Fictional invoice with a borderless line-item table.
+match:
+  required_text: [INVOICE, Amount due]
+  required_headers: [Pos, Description, Qty, Unit, Unit price, Total]
+pipeline:
+  - op: pdf.table_from_header
+    as: tables
+    params:
+      header: [Pos, Description, Qty, Unit, Unit price, Total]  # "Unit price" spans two words
+      end_before_text: [Net amount]                             # totals block below the items
+      new_row_column: Pos
+  - op: table.map_columns
+    input: tables
+    as: items
+    params:
+      column_mapping:
+        Pos: position
+        Description: description
+        Qty: quantity
+        Unit: unit
+        Unit price: unit_price
+        Total: total
+      optional_parsing:
+        quantity: {type: decimal, decimal_separator: '.', thousands_separator: ','}
+        unit_price: {type: decimal, decimal_separator: '.', thousands_separator: ','}
+        total: {type: decimal, decimal_separator: '.', thousands_separator: ','}
+output: {kind: records}
+validation: {require_provenance: true, layout_mismatch: needs_review}

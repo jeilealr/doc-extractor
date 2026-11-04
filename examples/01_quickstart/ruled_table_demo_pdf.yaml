@@ -1,0 +1,29 @@
+# Sample, runnable source-specific PDF profile (only for our synthetic demo PDF).
+profile_schema_version: 1
+id: demo.ruled_table.pdf.v1
+version: 1.0.0
+kind: source
+format: pdf
+match:
+  required_headers: [Date, Description, Amount]
+pipeline:
+  - op: pdf.collect_text_blocks
+    as: content
+    params: {preserve_raw: true, include_page_and_bbox: true}
+  - op: pdf.detect_tables
+    as: tables
+    params:
+      vertical_strategy: lines
+      horizontal_strategy: lines
+      preserve_raw_cells: true
+      include_cell_bbox: true
+  - op: table.map_columns
+    input: tables
+    as: records
+    params:
+      column_mapping: {Date: date_raw, Description: description_raw, Amount: amount_raw}
+      optional_parsing:
+        date_raw: {type: date, format: '%Y-%m-%d'}
+        amount_raw: {type: decimal, decimal_separator: '.', thousands_separator: ','}
+output: {kind: records}
+validation: {require_provenance: true, layout_mismatch: needs_review}

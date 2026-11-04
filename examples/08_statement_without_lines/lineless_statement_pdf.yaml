@@ -1,0 +1,42 @@
+# Source profile for the fictional "Banco de Ejemplo" statement in
+# examples/08_statement_without_lines/data/demo_lineless_statement.pdf.
+# The PDF draws no lines at all, so the table is located by its header row
+# (pdf.table_from_header) and the year of each DD/MM date comes from the statement period.
+profile_schema_version: 1
+id: demo.lineless_statement.es.pdf.v1
+version: 1.0.0
+kind: source
+format: pdf
+description: Fictional Spanish statement without drawn lines, day/month dates.
+match:
+  required_text: [Banco de Ejemplo, ESTADO DE CUENTA]
+  required_headers: [FECHA, DESCRIPCIÓN, SUCURSAL, DCTO., VALOR, SALDO]
+pipeline:
+  - op: pdf.table_from_header
+    as: tables
+    params:
+      header: [FECHA, DESCRIPCIÓN, SUCURSAL, DCTO., VALOR, SALDO]
+      # Stop above the closing line on the last page and above the footer on every page.
+      end_before_text: [FIN ESTADO DE CUENTA, "DCF:"]
+      # A line without a date would continue the previous transaction.
+      new_row_column: FECHA
+  - op: table.map_columns
+    input: tables
+    as: transactions
+    params:
+      column_mapping:
+        FECHA: date
+        DESCRIPCIÓN: description
+        SUCURSAL: branch
+        DCTO.: document
+        VALOR: amount
+        SALDO: balance
+      optional_parsing:
+        date:
+          type: date
+          format: '%d/%m'
+          year_from_period: {start_label: 'DESDE:', end_label: 'HASTA:', format: '%Y/%m/%d'}
+        amount: {type: decimal, decimal_separator: '.', thousands_separator: ','}
+        balance: {type: decimal, decimal_separator: '.', thousands_separator: ','}
+output: {kind: records}
+validation: {require_provenance: true, layout_mismatch: needs_review}

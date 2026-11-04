@@ -1,0 +1,11 @@
+
+### Extracted table: csv_1
+
+| Buchungstag | Valuta | Empfänger/Auftraggeber | Verwendungszweck | Betrag | Währung |
+| --- | --- | --- | --- | --- | --- |
+| 02.03.2026 | 02.03.2026 | Example Employer GmbH | Gehalt Februar | 3.250,00 | EUR |
+| 04.03.2026 | 05.03.2026 | Städtische Werke | Abschlag Strom März | -96,15 | EUR |
+| 08.03.2026 | 08.03.2026 | Bücherstube am Markt | Kartenzahlung | -23,90 | EUR |
+| 14.03.2026 | 14.03.2026 | Online Shop | Erstattung Bestellung 99812 | 29,99 | EUR |
+| 21.03.2026 | 21.03.2026 | Baumarkt Süd | Kartenzahlung; Werkzeug | -1.249,00 | EUR |
+| 30.03.2026 | 31.03.2026 | Northwind Example Bank | Kontoführungsgebühr | -4,95 | EUR |

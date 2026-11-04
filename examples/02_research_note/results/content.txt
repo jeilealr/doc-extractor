@@ -1,0 +1,27 @@
+Sorting Heuristics on Synthetic Workloads
+R. Placeholder and S. Sample, Example Institute
+Abstract
+We compare three fictional sorting heuristics on synthetic workloads. The results
+are invented for software testing and must not be cited. Values such as 0,95 and
+1.000 are written exactly as an author might, and an extractor must not 'fix' them.
+1 Introduction
+Document extraction tools are often evaluated on tidy inputs. This note instead mixes
+running text, a numbered section structure, a results table and a reference list,
+which is the minimum structure of most short scientific reports.
+2 Method
+Each heuristic was run five times on each of three workload sizes. We report the
+median runtime in milliseconds and the relative speed-up against the baseline.
+3 Results
+Heuristic n = 1k (ms) n = 10k (ms) n = 100k (ms) Speed-up
+Baseline 1.8 22.4 301.0 1.00
+Bucketed 1.2 14.9 187.5 1.61
+Adaptive 1.4 13.1 162.2 1.86
+Table 1: Median runtime over five runs (invented data).
+
+4 Discussion
+The adaptive heuristic is fastest for large inputs, while the bucketed
+variant wins for the smallest workload. Both claims hold only for this
+invented data set.
+References
+[1] A. Author. An Imaginary Survey of Sorting. Journal of Examples, 2024.
+[2] B. Writer. Placeholder Benchmarks. Proc. Workshop on Fictional Data, 2025.

@@ -1,0 +1,40 @@
+profile_schema_version: 1
+id: banking.santander.de.girokonto.pdf.v1
+kind: source
+format: pdf
+status: design_example_requires_parity_tests
+match:
+  required_text:
+    - 'DIESER KONTOAUSZUG UMFASST DIE'
+    - 'Buchungstag Wert Umsatz Buchungstext'
+pipeline:
+  - op: pdf.collect_text_lines
+    as: lines
+    params: {preserve_raw: true, include_page_and_bbox: true}
+  - op: text.capture_pattern
+    input: lines
+    as: statement_period
+    params:
+      scope: first_page
+      pattern: 'DIESER KONTOAUSZUG UMFASST DIE UMSÄTZE VOM\s+(?P<start>\d{2}\.\d{2}\.\d{4})\s+BIS\s+(?P<end>\d{2}\.\d{2}\.\d{4})'
+  - op: text.match_rows
+    input: lines
+    as: transaction_rows
+    params:
+      pattern: '^(?P<booking>\d{2}\.\d{2}\.)\s+(?P<value>\d{2}\.\d{2}\.)\s+(?P<amount>(?:\d{1,3}(?:\.\d{3})*|\d+),\d{2})\s*(?P<sign>-)?\s+(?P<description>.+)$'
+      preserve_raw: true
+      on_date_like_unmatched_line: needs_review
+  - op: text.attach_continuation_lines
+    input: transaction_rows
+    as: records
+    params:
+      preserve_raw_spans: true
+      ignore_known_headers_and_footers: true
+      unresolved_lines: needs_review
+output:
+  kind: records
+validation:
+  require_provenance: true
+  layout_mismatch: needs_review
+# The exact ignored-header rules, period-year resolution and balance rows
+# must be proven against the existing Python parser before this can run.

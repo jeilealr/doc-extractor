@@ -1,0 +1,43 @@
+# Source profile for the fictional "Northwind Example Bank" statement in
+# examples/03_bank_statement_pdf/data/demo_statement.pdf. It shows the shape of a real bank-statement profile:
+#   - match:   evidence that this really is the expected layout (text + exact table headers)
+#   - pipeline: which generic operations to run and with which table settings
+#   - mapping:  which source columns become which record fields, and how to normalize them
+# Every page repeats the header row, so each page becomes its own record set.
+profile_schema_version: 1
+id: demo.northwind.statement.pdf.v1
+version: 1.0.0
+kind: source
+format: pdf
+description: Fictional bank statement with a fully ruled transaction table.
+match:
+  required_text: [Northwind Example Bank, Account statement]
+  required_headers: [Booking date, Value date, Description, Amount (EUR), Balance (EUR)]
+pipeline:
+  - op: pdf.collect_text_blocks
+    as: content
+    params: {preserve_raw: true, include_page_and_bbox: true}
+  - op: pdf.detect_tables
+    as: tables
+    params:
+      vertical_strategy: lines
+      horizontal_strategy: lines
+      preserve_raw_cells: true
+      include_cell_bbox: true
+  - op: table.map_columns
+    input: tables
+    as: transactions
+    params:
+      column_mapping:
+        Booking date: booking_date
+        Value date: value_date
+        Description: description
+        Amount (EUR): amount
+        Balance (EUR): balance
+      optional_parsing:
+        booking_date: {type: date, format: '%d.%m.%Y'}
+        value_date: {type: date, format: '%d.%m.%Y'}
+        amount: {type: decimal, decimal_separator: ',', thousands_separator: '.'}
+        balance: {type: decimal, decimal_separator: ',', thousands_separator: '.'}
+output: {kind: records}
+validation: {require_provenance: true, layout_mismatch: needs_review}

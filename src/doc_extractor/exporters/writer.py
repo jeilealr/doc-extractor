@@ -1,0 +1,164 @@
+"""Render or safely export extracted content without silently editing raw values."""
+
+from __future__ import annotations
+
+import json
+import os
+import tempfile
+from pathlib import Path
+from typing import Any
+
+from ..errors import ExportError
+from ..models import ExtractionResult
+
+
+def markdown(result: ExtractionResult) -> str:
+    """Readable but lossy view; JSON is the source-of-truth for cell locations."""
+    chunks: list[str] = []
+    for page in result.pages:
+        chunks.append(f"## Page {page.number}\n\n{page.text}\n")
+    if result.mode in {"tables", "all"}:
+        for table in result.tables:
+            chunks.append(f"\n### Extracted table: {table.id}\n")
+            for index, row in enumerate(table.values()):
+                display = [str(value or "").replace("|", "\\|").replace("\n", " ") for value in row]
+                chunks.append("| " + " | ".join(display) + " |")
+                if index == 0:
+                    # Markdown needs a delimiter row; without it viewers show plain text.
+                    chunks.append("| " + " | ".join("---" for _ in display) + " |")
+            chunks.append("")
+        if not result.tables:
+            # Say so explicitly; an empty page of output looks like a crash.
+            hints = [i.message for i in result.issues if i.code == "NO_TABLES_FOUND"]
+            chunks.append("\n_" + (" ".join(hints) or "No tables were detected.") + "_")
+    if result.mode == "records":
+        for recordset in result.record_sets:
+            chunks.append(f"\n### Record set: {recordset.id} (raw values)\n")
+            if not recordset.records:
+                continue
+            headers = list(recordset.records[0])
+            chunks.append("| " + " | ".join(headers) + " |")
+            chunks.append("| " + " | ".join("---" for _ in headers) + " |")
+            for record in recordset.records:
+                display = [
+                    str(record[h].raw or "").replace("|", "\\|").replace("\n", " ") for h in headers
+                ]
+                chunks.append("| " + " | ".join(display) + " |")
+        if not result.record_sets:
+            chunks.append("\n_No matching source profile records were extracted._\n")
+    return "\n".join(chunks).rstrip() + "\n"
+
+
+def _atomic_write(destination: Path, data: bytes) -> None:
+    if destination.exists() or destination.is_symlink():
+        raise ExportError("Output already exists; choose a new path (no implicit overwrite)")
+    temporary = None
+    try:
+        destination.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+        if not destination.parent.is_dir():
+            raise ExportError("Output parent is not a directory")
+        with tempfile.NamedTemporaryFile(
+            mode="wb", dir=destination.parent, prefix=".doc-extractor-", delete=False
+        ) as f:
+            temporary = Path(f.name)
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        # Use exclusive create to avoid overwriting files from a concurrent writer.
+        try:
+            os.link(temporary, destination)
+        except FileExistsError as exc:
+            raise ExportError("Output path became occupied during export") from exc
+    except OSError as exc:
+        raise ExportError("Could not write output file") from exc
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _export_tabular(result: ExtractionResult, fmt: str, destination: Path) -> Path:
+    try:
+        import polars  # noqa: F401
+    except ImportError as exc:
+        raise ExportError(
+            "Tabular export requires Polars: pip install 'doc-extractor[tabular]'"
+        ) from exc
+    if fmt == "arrow":
+        try:
+            import pyarrow as pa  # noqa: F401
+            import pyarrow.ipc  # noqa: F401
+        except ImportError as exc:
+            raise ExportError(
+                "Arrow export requires PyArrow: pip install 'doc-extractor[arrow]'"
+            ) from exc
+    if destination.exists() or destination.is_symlink():
+        raise ExportError("Output directory already exists; choose a new path")
+    try:
+        destination.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=destination.parent, prefix=".doc-extractor-") as temp:
+            staging = Path(temp)
+            # temp dir is created at 0700; keep private document output private.
+            items: list[tuple[str, Any]] = []
+            if result.mode == "records":
+                items.extend(
+                    (r.id, r.to_polars(include_normalized=True))
+                    for r in result.record_sets
+                    if r.records
+                )
+            else:
+                items.extend((t.id, t.to_polars()) for t in result.tables if t.cells)
+            if not items:
+                raise ExportError("No tables or record sets to export in tabular format")
+            for name, frame in items:
+                # IDs are generated by the library, never supplied by an input PDF.
+                if not name.replace("_", "").isalnum():
+                    raise ExportError("Unsafe table ID in export")
+                target = staging / f"{name}.{fmt}"
+                if fmt == "parquet":
+                    frame.write_parquet(target)
+                else:
+                    import pyarrow as pa
+
+                    with pa.OSFile(str(target), "wb") as sink:
+                        with pa.ipc.new_file(sink, frame.to_arrow().schema) as writer:
+                            writer.write_table(frame.to_arrow())
+            (staging / "manifest.json").write_text(
+                json.dumps(result.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            try:
+                staging.rename(destination)
+            except OSError as exc:
+                raise ExportError("Could not publish the output directory") from exc
+    except OSError as exc:
+        raise ExportError("Could not export tabular data") from exc
+    return destination
+
+
+def export_result(
+    result: ExtractionResult,
+    fmt: str = "json",
+    destination: str | Path | None = None,
+) -> str | Path:
+    """Without destination, text formats return a string (for a CLI stdout stream)."""
+    if fmt not in {"json", "markdown", "text", "parquet", "arrow"}:
+        raise ExportError("Supported formats: json, markdown, text, parquet, arrow")
+    if fmt in {"parquet", "arrow"}:
+        if destination is None:
+            raise ExportError("Parquet/Arrow export requires an explicit output directory")
+        return _export_tabular(result, fmt, Path(destination).expanduser())
+    if fmt == "json":
+        text = json.dumps(result.to_dict(), ensure_ascii=False, indent=2) + "\n"
+    elif fmt == "markdown":
+        text = markdown(result)
+    else:
+        if result.file_format != "pdf" or result.mode not in {"content", "all"}:
+            raise ExportError(
+                "Plain-text export requires a PDF extracted with --mode content or all; "
+                "--to text holds only page text, use --to markdown or json for tables and records"
+            )
+        text = "\n\n".join(page.text for page in result.pages) + "\n"
+    if destination is None:
+        return text
+    target = Path(destination).expanduser()
+    _atomic_write(target, text.encode("utf-8"))
+    return target

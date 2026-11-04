@@ -1,0 +1,132 @@
+# Continuous integration, modelled on FINAM's GitLab pipeline (check → test → docs → build).
+# FINAM runs black, isort and pylint; here ruff covers all three (`ruff format` = black style,
+# `ruff check` with the `I` rules = isort, plus pyflakes/bugbear/pyupgrade/bandit rules).
+# Run the same checks locally before pushing:
+#   ruff format --check . && ruff check . && python -m pytest && make -C docs html
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  FORCE_COLOR: "1"
+
+jobs:
+  check:
+    name: format and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff (same version range as the dev extra)
+        run: python -m pip install "ruff>=0.17,<0.18"
+      - name: Formatting (black style)
+        run: ruff format --check --diff .
+      - name: Import order (isort rules)
+        run: ruff check --select I --output-format=github .
+      - name: Lint (pyflakes, pycodestyle, bugbear, pyupgrade, bandit)
+        run: ruff check --output-format=github .
+      - name: YAML profiles and presets are valid
+        run: |
+          python -m pip install -e .
+          # docs/design/bank-profiles/ holds non-runnable sketches and must fail validation.
+          for f in src/doc_extractor/presets/*.yaml examples/0*/*.yaml; do
+            doc-extractor profiles validate "$f" > /dev/null || { echo "invalid: $f"; exit 1; }
+          done
+          for f in docs/design/bank-profiles/*.yaml; do
+            if doc-extractor profiles validate "$f" > /dev/null 2>&1; then
+              echo "planned profile unexpectedly valid: $f"; exit 1
+            fi
+          done
+
+  test:
+    name: tests (${{ matrix.os }}, py${{ matrix.python-version }})
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.10", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package with all extras
+        run: python -m pip install -e '.[all,dev]'
+      - name: Tests, examples, 100% statement and branch coverage, no skipped integrations
+        env:
+          DOC_EXTRACTOR_REQUIRE_EXTRAS: "1"
+        run: >-
+          python -m pytest -q
+          --cov=doc_extractor --cov-branch
+          --cov-report=term-missing --cov-report=xml
+          --cov-fail-under=100
+      - name: Package runs as module and CLI
+        run: |
+          python -m doc_extractor --version
+          doc-extractor --version
+          doc-extractor profiles list
+      - name: Upload coverage report
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+
+  docs:
+    name: documentation
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package with docs extra
+        run: python -m pip install -e '.[docs]'
+      - name: Build HTML (warnings are errors)
+        run: make -C docs html
+      - name: Upload HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-html
+          path: docs/_build/html
+
+  build:
+    name: build distribution
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install "build>=1.2,<2" "twine>=5,<7"
+          python -m build
+          python -m twine check --strict dist/*
+      - name: Wheel installs cleanly and ships the presets
+        run: |
+          python -m venv /tmp/wheel-env
+          /tmp/wheel-env/bin/pip install dist/*.whl
+          /tmp/wheel-env/bin/doc-extractor profiles list | grep -q preset.pdf.tables.ruled.v1
+      - name: Upload distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist

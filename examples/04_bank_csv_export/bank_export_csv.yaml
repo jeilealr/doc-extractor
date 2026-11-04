@@ -1,0 +1,38 @@
+# Source profile for examples/04_bank_csv_export/data/demo_bank_export.csv: a German online-banking export
+# with ';' as delimiter, Windows cp1252 encoding (umlauts), DD.MM.YYYY dates and 1.234,56
+# amounts. Pinning encoding and delimiter here means users don't need --encoding/--delimiter.
+profile_schema_version: 1
+id: demo.bank_export.de.csv.v1
+version: 1.0.0
+kind: source
+format: csv
+description: Fictional German bank CSV export (semicolon, cp1252).
+match:
+  required_headers: [Buchungstag, Valuta, Empfänger/Auftraggeber, Verwendungszweck, Betrag, Währung]
+pipeline:
+  - op: csv.collect_raw_rows
+    as: raw_rows
+    params:
+      encoding: cp1252
+      delimiter: ';'
+      first_row_header: true
+      infer_types: false
+      keep_raw_cell_strings: true
+      include_row_and_column: true
+  - op: table.map_columns
+    input: raw_rows
+    as: transactions
+    params:
+      column_mapping:
+        Buchungstag: booking_date
+        Valuta: value_date
+        Empfänger/Auftraggeber: counterparty
+        Verwendungszweck: purpose
+        Betrag: amount
+        Währung: currency
+      optional_parsing:
+        booking_date: {type: date, format: '%d.%m.%Y'}
+        value_date: {type: date, format: '%d.%m.%Y'}
+        amount: {type: decimal, decimal_separator: ',', thousands_separator: '.'}
+output: {kind: records}
+validation: {require_provenance: true, layout_mismatch: needs_review}

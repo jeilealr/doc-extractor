@@ -1,0 +1,20 @@
+profile_schema_version: 1
+id: banking.revolut.en_gb.statement.pdf.v1
+kind: source
+format: pdf
+status: design_example_requires_python_adapter
+match:
+  required_text: ['EUR Statement', 'Money out', 'Money in']
+processor:
+  kind: registered_python_adapter
+  adapter_id: banking.revolut.en_gb.statement.v1
+  params:
+    line_tolerance: 2.5
+    preserve_word_coordinates: true
+    detect_account_sections: true
+output:
+  kind: records
+validation:
+  require_provenance: true
+  layout_mismatch: needs_review
+# adapter_id is a trusted registered identifier, never a Python import path.

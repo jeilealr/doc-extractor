@@ -1,0 +1,19 @@
+profile_schema_version: 1
+id: preset.document.scientific.basic.v1
+version: 1.0.0
+kind: preset
+format: pdf
+purpose: Preserve scientific source lines and find basic ruled tables (no equation parser).
+pipeline:
+  - op: pdf.collect_text_blocks
+    as: text_blocks
+    params: {preserve_raw: true, include_page_and_bbox: true}
+  - op: pdf.detect_tables
+    as: tables
+    params:
+      vertical_strategy: lines
+      horizontal_strategy: lines
+      preserve_raw_cells: true
+      include_cell_bbox: true
+output: {kind: document_with_tables}
+validation: {require_provenance: true}

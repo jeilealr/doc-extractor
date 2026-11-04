@@ -1,0 +1,12 @@
+profile_schema_version: 1
+id: preset.pdf.text.v1
+version: 1.0.0
+kind: preset
+format: pdf
+purpose: Extract PDF text lines and their page-local bounding boxes.
+pipeline:
+  - op: pdf.collect_text_blocks
+    as: text_blocks
+    params: {preserve_raw: true, include_page_and_bbox: true}
+output: {kind: document}
+validation: {require_provenance: true}

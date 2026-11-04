@@ -1,0 +1,18 @@
+profile_schema_version: 1
+id: preset.csv.generic.v1
+version: 1.0.0
+kind: preset
+format: csv
+purpose: Preserve CSV cells and conservative UTF-8 decoding, with configurable delimiter.
+pipeline:
+  - op: csv.collect_raw_rows
+    as: rows
+    params:
+      encoding: detect_or_require_override
+      delimiter: detect_or_require_override
+      infer_types: false
+      keep_raw_cell_strings: true
+      include_row_and_column: true
+      first_row_header: true
+output: {kind: tables}
+validation: {require_provenance: true}

@@ -1,0 +1,31 @@
+# Demonstration profile from the observed column schema only. Not a finance policy.
+profile_schema_version: 1
+id: banking.payback.de.activity.csv.v1
+version: 0.1.0
+kind: source
+format: csv
+match:
+  required_headers: [Datum, Beschreibung, Betrag]
+pipeline:
+  - op: csv.collect_raw_rows
+    as: raw_rows
+    params:
+      encoding: utf-8-sig
+      delimiter: ','
+      first_row_header: true
+      infer_types: false
+      keep_raw_cell_strings: true
+      include_row_and_column: true
+  - op: table.map_columns
+    input: raw_rows
+    as: mapped
+    params:
+      column_mapping:
+        Datum: date_raw
+        Beschreibung: description_raw
+        Betrag: amount_raw
+      optional_parsing:
+        date_raw: {type: date, format: '%d/%m/%Y'}
+        amount_raw: {type: decimal, decimal_separator: ',', thousands_separator: '.'}
+output: {kind: records}
+validation: {require_provenance: true, layout_mismatch: needs_review}

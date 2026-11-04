@@ -1,0 +1,21 @@
+profile_schema_version: 1
+id: preset.pdf.tables.borderless.v1
+version: 1.0.0
+kind: preset
+format: pdf
+purpose: Detect tables by word alignment, for PDFs without physical cell borders.
+pipeline:
+  - op: pdf.collect_text_blocks
+    as: text_blocks
+    params: {preserve_raw: true, include_page_and_bbox: true}
+  - op: pdf.detect_tables
+    as: tables
+    params:
+      vertical_strategy: text
+      horizontal_strategy: text
+      min_words_vertical: 3
+      min_words_horizontal: 2
+      preserve_raw_cells: true
+      include_cell_bbox: true
+output: {kind: tables}
+validation: {require_provenance: true}
