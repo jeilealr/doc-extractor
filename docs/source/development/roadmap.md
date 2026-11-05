@@ -10,6 +10,26 @@
 - JSON, Markdown and text; optional Polars and Parquet/Arrow paths.
 - Diagnostic warnings instead of pretending all PDF layouts are understood.
 - Tests with public-distributable synthetic fixtures and a separate local private bank corpus.
+- Header-located tables for PDFs without usable lines (`pdf.table_from_header`, with
+  `columns_x`, `new_row_column`, `end_before_text`) and day-month dates with the year from
+  the statement period (`year_from_period`). Verified on the fictional examples 06 and 08
+  and on a private Bancolombia statement (all balances reconcile).
+- CI (format, lint, tests at 100% coverage, docs, build), a local Sphinx docs site, and
+  self-contained numbered examples whose documented output is tested.
+
+## Still to do for V0.1
+
+- **Profiles for Revolut** (borderless, multi-line rows) **and Santander** (several lines per
+  transaction in one ruled cell) using `pdf.table_from_header`, kept outside this repository.
+- **Markdown output per mode:** `tables` shows only tables, `records` shows only record sets
+  with raw *and* normalized values, `all` shows records too when a profile is given (today
+  records are built but not printed).
+- **Document view for `all`:** one page in reading order, with each table placed where it
+  sits on the page instead of after the full page text. Text lines inside a table's bounding
+  box are left out (the table shows them), so header text, the table, and footer text
+  (`Continued on next page.`, closing balance) appear in the order you read them. Uses the
+  bounding boxes the tool already records for text lines and tables; JSON keeps everything
+  unchanged.
 
 ## Next milestones (not yet implemented)
 
@@ -24,12 +44,6 @@
 
 ### V0.3 - Profiles and finance bridge
 
-- ~~Header-located tables with column boundaries and continuation lines~~: **done** as
-  `pdf.table_from_header` (plus `columns_x` for explicit boundaries), and day-month dates with
-  the year from the statement period (`year_from_period`). Verified on the fictional
-  examples 06 and 08 and on a private Bancolombia statement (all balances reconcile).
-- Profiles for Revolut (borderless, multi-line rows) and Santander (several lines per
-  transaction in one ruled cell) using `pdf.table_from_header`, kept outside this repository.
 - Reusable row-grouping and text-line pattern operations with bounded expressions.
 - Santander and Revolut adapters and conservative layout fingerprints, including drift fixtures.
 - Bancolombia and other documents only after independent ground truth and appropriate licensing.
@@ -39,6 +53,9 @@
 
 - OCR for scanned PDFs with permissively licensed tools/models (after license audit).
 - Complex scientific layouts, reading-order reconstruction, equation/figure relations.
+- Extend the document view: equations as their own blocks, and placeholders for images and
+  figures (`[figure, page 3, bbox …]`) where they sit, so nothing on the page is silently
+  dropped.
 - Safe sandbox and per-job CPU/memory/time limits for untrusted user uploads.
 - Optional structured document search and report generation; no mandatory model APIs.
 

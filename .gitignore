@@ -12,6 +12,7 @@ dist/
 .env
 .DS_Store
 .private/
+.vscode/
 private/
 *.parquet
 *.arrow
@@ -20,3 +21,5 @@ docs/private
 docs/_build/
 docs/source/_generated/
 docs/source/reference/generated/
+AGENNTS.md
+CLAUDE.md

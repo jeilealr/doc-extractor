@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 (continued, branch `v0.1.0`, not yet released)
 
 - **`pdf.table_from_header`**: new profile operation for tables without (usable) lines.
   Finds the header row by its column names, places column boundaries in the empty gaps
